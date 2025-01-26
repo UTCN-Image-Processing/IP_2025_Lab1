@@ -1,7 +1,9 @@
-name: Build and Test Student Submission
+name: Build and Test
 
 on:
   push:
+    branches: [ "main" ]
+  pull_request:
     branches: [ "main" ]
 
 jobs:
@@ -9,40 +11,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Check out the "Lab1-Tests" repository itself
-      - name: Checkout Tests Repo
+      # Step 1) Check out the student's own repository (the default behavior)
+      - name: Checkout Student Repo
+        uses: actions/checkout@v3
+
+      # Step 2) Check out the private test repo into a subfolder 'private_tests'
+      # We use the 'repository' parameter with org/repo name,
+      # and we provide a token that has read access to that repo.
+      - name: Checkout Private Tests Repo
         uses: actions/checkout@v3
         with:
-          # This checks out the *current* private test repo
-          # so we have test_lab1.cpp, images, etc.
-          path: tests-repo
+          repository: mbjurca/IP_2025_Lab1_tests
+          token: ${{ secrets.TEST_REPO_TOKEN }}  # Secret defined in your student's repo settings
+          path: private_tests
 
-      # 2) Check out the student's submission repository
-      - name: Checkout Student Submission
-        uses: actions/checkout@v3
-        with:
-          repository: my-org/Lab1-StudentSubmission
-          path: student-repo
-
-      # 3) Replace or copy student’s lab1.cpp into the tests "src" folder
-      #    or, conversely, copy test code into student's folder. You can choose the direction.
-      - name: Copy Student Code
+      # Step 3) Copy the student's lab1.cpp/lab1.h over to the test repo
+      - name: Copy Student Code into Private Tests
         run: |
-          cp student-repo/src/lab1.cpp tests-repo/src/lab1.cpp
-          cp student-repo/src/lab1.h   tests-repo/src/lab1.h
+          cp src/lab1.cpp private_tests/src/lab1.cpp
+          cp src/lab1.h   private_tests/src/lab1.h
 
-      # 4) Build: (Install dependencies, run CMake, etc.)
-      - name: Install dependencies
+      # Step 4) Install needed dependencies: CMake, OpenCV, etc.
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake g++ libopencv-dev
 
+      # Step 5) Configure with CMake in the 'private_tests' directory (output to 'build')
       - name: Configure (CMake)
-        run: cmake -S tests-repo -B tests-repo/build
+        run: cmake -S private_tests -B build
 
+      # Step 6) Build
       - name: Build
-        run: cmake --build tests-repo/build
+        run: cmake --build build
 
-      # 5) Run tests (ctest)
+      # Step 7) Run tests. Because we used `gtest_discover_tests()` in the private repo's
+      #          CMakeLists.txt, each TEST(...) in test_lab1.cpp will show up as a separate
+      #          test in the logs.
       - name: Test
-        run: ctest --test-dir tests-repo/build --verbose
+        run: ctest --test-dir build --output-on-failure
