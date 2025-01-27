@@ -24,6 +24,7 @@ jobs:
           repository: mbjurca/IP_2025_Lab1_tests
           token: ${{ secrets.TEST_REPO_TOKEN }}  # Secret defined in your student's repo settings
           path: private_tests
+          ref: main
 
       # Step 3) Copy the student's lab1.cpp/lab1.h over to the test repo
       - name: Copy Student Code into Private Tests
