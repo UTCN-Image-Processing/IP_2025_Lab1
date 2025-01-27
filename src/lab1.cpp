@@ -92,7 +92,7 @@ Mat draw_squares(int rows, int cols){
     
     //*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
 
-    return image;
+    return Mat(1,1, CV_64F, 0.0);;
 
 }
 
