@@ -39,7 +39,7 @@ Mat add_scalar(Mat image, int factor){
 
     //*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
 
-    return 0;
+    return image;
 
 }
 
@@ -64,7 +64,7 @@ Mat mul_scalar(Mat image, float factor){
   
     //*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
 
-    return 0;
+    return image;
 
 }
 
@@ -92,7 +92,7 @@ Mat draw_squares(int rows, int cols){
     
     //*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
 
-    return 0;
+    return image;
 
 }
 
