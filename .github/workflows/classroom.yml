@@ -49,5 +49,36 @@ jobs:
       # Step 7) Run tests. Because we used `gtest_discover_tests()` in the private repo's
       #          CMakeLists.txt, each TEST(...) in test_lab1.cpp will show up as a separate
       #          test in the logs.
-      - name: Test
-        run: ctest --test-dir build --output-on-failure
+      - name: Test (Produce JSON)
+        run: |
+          ctest --test-dir build --output-on-failure --output-json results.json
+      
+      - name: Calculate Points
+        run: |
+          python3 <<EOF
+          import json
+      
+          test_points = {
+              "Lab1Test.NegativeImage": 10,
+              # ... etc ...
+              "Lab1Test.DrawSquares_2x2": 6
+          }
+      
+          with open("results.json", "r") as f:
+              data = json.load(f)
+      
+          total_score = 0
+          for t in data["tests"]:
+              name = t["name"]
+              status = t["status"]
+              pts = test_points.get(name, 0)
+              if status == "passed":
+                  print(f"{name} => PASSED => +{pts} pts")
+                  total_score += pts
+              else:
+                  print(f"{name} => FAILED => +0 pts (possible {pts})")
+      
+          print("=========================================")
+          print(f"TOTAL POINTS: {total_score}")
+          EOF
+      
