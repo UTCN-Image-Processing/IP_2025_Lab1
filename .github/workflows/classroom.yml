@@ -47,20 +47,20 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      # Step 7: Run Tests with CTest (Allow Failure)
+      # Step 7: Run Tests with CTest
       - name: Run Tests (JUnit)
-        run: ctest --test-dir build --output-on-failure --output-junit results.xml
-        continue-on-error: true  # Allows the workflow to continue even if tests fail
+        run: |
+          ctest --test-dir build --output-on-failure --output-junit results.xml
+        continue-on-error: true 
 
-      # Step 8: Parse JUnit Results, Calculate Score & Set Output
-      - name: Parse JUnit, Calculate Score & Annotate
-        id: grading  # Assign an ID to reference outputs later
-        if: always()  # Ensure this step runs regardless of previous step outcomes
+      # Step 8: Parse JUnit Results into Autograding JSON
+      - name: Parse JUnit, Calculate Score, & Export Results
+        id: grading
         run: |
           python3 <<EOF
+          import json
           import xml.etree.ElementTree as ET
-          import os
-          
+
           # Define point values for each test
           test_points = {
             "Lab1Test.NegativeImage": 10,
@@ -75,39 +75,40 @@ jobs:
             "Lab1Test.DrawSquares": 10,
             "Lab1Test.DrawSquares_2x2": 6
           }
-          
+
           # Parse the JUnit XML results
           tree = ET.parse("build/results.xml")
           root = tree.getroot()
           total_score = 0
-          
-          output = []
+          test_results = []
+
           for testcase in root.iter("testcase"):
               name = testcase.get("name", "")
               failed = (testcase.find("failure") is not None or testcase.find("error") is not None)
               possible = test_points.get(name, 0)
-              if not failed:
-                  result = f"{name}: PASSED (+{possible} pts)"
-                  total_score += possible
-              else:
-                  result = f"{name}: FAILED (+0 pts, was {possible} pts)"
-              output.append(result)
-          
-          output.append("=========================================")
-          output.append(f"TOTAL POINTS: {total_score}")
-          
-          # Print the output for logging
-          print("\n".join(output))
-          
-          # Export the total score as a step output
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as env_file:
-              env_file.write(f"points={total_score}\n")
+              score = possible if not failed else 0
+              total_score += score
+              test_results.append({
+                  "name": name,
+                  "score": score,
+                  "max_score": possible,
+                  "output": "PASSED" if score > 0 else "FAILED"
+              })
+
+          # Export results in the required autograding JSON format
+          autograding_results = {
+              "tests": test_results
+          }
+
+          with open("results.json", "w") as f:
+              json.dump(autograding_results, f, indent=2)
+
+          print(f"TOTAL SCORE: {total_score}")
           EOF
 
-      # Step 9: Annotate the Repository with the Score (Using education/autograding Action)
-      - name: Annotate with Score
-        id: mark
-        uses: markpatterson27/autograding@dev-points-input-release
+      # Step 9: Upload Results for Autograding
+      - name: Upload Results for GitHub Classroom
+        uses: actions/upload-artifact@v3
         with:
-          points: 10
-          available-points: 100
+          name: autograding-results
+          path: results.json
