@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: mbjurca/IP_2025_Lab1_tests
-          token: ${{ secrets.TEST_REPO_TOKEN }}  # Ensure this secret is set in the private tests repo
+          token: ${{ secrets.TEST_REPO_TOKEN }}
           path: private_tests
           ref: main
 
@@ -48,67 +48,14 @@ jobs:
         run: cmake --build build
 
       # Step 7: Run Tests with CTest
-      - name: Run Tests (JUnit)
+      - name: Run Tests
         run: |
-          ctest --test-dir build --output-on-failure --output-junit results.xml
-        continue-on-error: true 
+          ctest --test-dir build --output-on-failure
+        continue-on-error: true
 
-      # Step 8: Parse JUnit Results into Autograding JSON
-      - name: Parse JUnit, Calculate Score, & Export Results
-        id: grading
-        run: |
-          python3 <<EOF
-          import json
-          import xml.etree.ElementTree as ET
 
-          # Define point values for each test
-          test_points = {
-            "Lab1Test.NegativeImage": 10,
-            "Lab1Test.NegativeImage_EmptyMat": 5,
-            "Lab1Test.NegativeImage_1x1": 5,
-            "Lab1Test.AddScalar": 10,
-            "Lab1Test.AddScalar_Zero": 3,
-            "Lab1Test.AddScalar_Negative": 4,
-            "Lab1Test.MulScalar_Regular": 10,
-            "Lab1Test.MulScalar_ZeroFactor": 3,
-            "Lab1Test.MulScalar_FactorGreaterThan1": 4,
-            "Lab1Test.DrawSquares": 10,
-            "Lab1Test.DrawSquares_2x2": 6
-          }
-
-          # Parse the JUnit XML results
-          tree = ET.parse("build/results.xml")
-          root = tree.getroot()
-          total_score = 0
-          test_results = []
-
-          for testcase in root.iter("testcase"):
-              name = testcase.get("name", "")
-              failed = (testcase.find("failure") is not None or testcase.find("error") is not None)
-              possible = test_points.get(name, 0)
-              score = possible if not failed else 0
-              total_score += score
-              test_results.append({
-                  "name": name,
-                  "score": score,
-                  "max_score": possible,
-                  "output": "PASSED" if score > 0 else "FAILED"
-              })
-
-          # Export results in the required autograding JSON format
-          autograding_results = {
-              "tests": test_results
-          }
-
-          with open("results.json", "w") as f:
-              json.dump(autograding_results, f, indent=2)
-
-          print(f"TOTAL SCORE: {total_score}")
-          EOF
-
-      # Step 9: Upload Results for Autograding
-      - name: Upload Results for GitHub Classroom
-        uses: actions/upload-artifact@v3
+      # Step 8: Run Education Autograding
+      - name: Autograding
+        uses: education/autograding@v1
         with:
-          name: autograding-results
-          path: results.json
+          config-path: .github/classroom/autograding.json
