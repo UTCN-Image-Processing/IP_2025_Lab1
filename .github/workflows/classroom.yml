@@ -49,54 +49,6 @@ jobs:
       # Step 7) Run tests. Because we used `gtest_discover_tests()` in the private repo's
       #          CMakeLists.txt, each TEST(...) in test_lab1.cpp will show up as a separate
       #          test in the logs.
-      - name: Test (Produce JSON)
+      - name: Test
         run: |
-          ctest --test-dir build --output-on-failure --output-junit results.xml
-      
-     - name: Parse JUnit & Calculate Score
-        run: |
-          python3 <<EOF
-          import xml.etree.ElementTree as ET
-      
-          # Map each test name to a point value
-          test_points = {
-            "Lab1Test.NegativeImage": 10,
-            "Lab1Test.NegativeImage_EmptyMat": 5,
-            "Lab1Test.NegativeImage_1x1": 5,
-            "Lab1Test.AddScalar": 10,
-            "Lab1Test.AddScalar_Zero": 3,
-            "Lab1Test.AddScalar_Negative": 4,
-            "Lab1Test.MulScalar_Regular": 10,
-            "Lab1Test.MulScalar_ZeroFactor": 3,
-            "Lab1Test.MulScalar_FactorGreaterThan1": 4,
-            "Lab1Test.DrawSquares": 10,
-            "Lab1Test.DrawSquares_2x2": 6
-          }
-      
-          # Parse the JUnit XML file we created
-          tree = ET.parse("results.xml")
-          root = tree.getroot()
-      
-          total_score = 0
-      
-          # JUnit XML typically has <testsuites> -> <testsuite> -> <testcase> elements
-          # We'll iterate through <testcase> elements
-          for testcase in root.iter("testcase"):
-              # Example attributes:
-              #   <testcase name="Lab1Test.NegativeImage" classname="Lab1Test" time="0.001">
-              name = testcase.get("name", "")
-              # If there's a <failure> or <error> child, test failed
-              failed = (testcase.find("failure") is not None or testcase.find("error") is not None)
-      
-              possible_pts = test_points.get(name, 0)
-              if not failed:
-                  print(f"{name} => PASSED => +{possible_pts} pts")
-                  total_score += possible_pts
-              else:
-                  print(f"{name} => FAILED => +0 pts (possible {possible_pts})")
-      
-          print("=========================================")
-          print(f"TOTAL POINTS: {total_score}")
-          EOF
-      
-            
+          ctest --test-dir build --output-on-failure
