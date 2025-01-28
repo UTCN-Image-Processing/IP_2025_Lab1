@@ -9,46 +9,106 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
 
     steps:
-      # Step 1) Check out the student's own repository (the default behavior)
       - name: Checkout Student Repo
         uses: actions/checkout@v3
 
-      # Step 2) Check out the private test repo into a subfolder 'private_tests'
-      # We use the 'repository' parameter with org/repo name,
-      # and we provide a token that has read access to that repo.
       - name: Checkout Private Tests Repo
         uses: actions/checkout@v3
         with:
           repository: mbjurca/IP_2025_Lab1_tests
-          token: ${{ secrets.TEST_REPO_TOKEN }}  # Secret defined in your student's repo settings
+          token: ${{ secrets.TEST_REPO_TOKEN }}
           path: private_tests
           ref: main
 
-      # Step 3) Copy the student's lab1.cpp/lab1.h over to the test repo
       - name: Copy Student Code into Private Tests
         run: |
           cp src/lab1.cpp private_tests/src/lab1.cpp
           cp src/lab1.h   private_tests/src/lab1.h
 
-      # Step 4) Install needed dependencies: CMake, OpenCV, etc.
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake g++ libopencv-dev
 
-      # Step 5) Configure with CMake in the 'private_tests' directory (output to 'build')
       - name: Configure (CMake)
         run: cmake -S private_tests -B build
 
-      # Step 6) Build
       - name: Build
         run: cmake --build build
 
-      # Step 7) Run tests. Because we used `gtest_discover_tests()` in the private repo's
-      #          CMakeLists.txt, each TEST(...) in test_lab1.cpp will show up as a separate
-      #          test in the logs.
       - name: Test
+        run: ctest --test-dir build --output-on-failure --output-junit results.xml
+
+      - name: Parse JUnit, Calculate Score & Annotate
+        if: always()
         run: |
-          ctest --test-dir build --output-on-failure
+          python3 <<EOF
+          import xml.etree.ElementTree as ET
+          import os
+      
+          test_points = {
+            "Lab1Test.NegativeImage": 10,
+            "Lab1Test.NegativeImage_EmptyMat": 5,
+            "Lab1Test.NegativeImage_1x1": 5,
+            "Lab1Test.AddScalar": 10,
+            "Lab1Test.AddScalar_Zero": 3,
+            "Lab1Test.AddScalar_Negative": 4,
+            "Lab1Test.MulScalar_Regular": 10,
+            "Lab1Test.MulScalar_ZeroFactor": 3,
+            "Lab1Test.MulScalar_FactorGreaterThan1": 4,
+            "Lab1Test.DrawSquares": 10,
+            "Lab1Test.DrawSquares_2x2": 6
+          }
+      
+          tree = ET.parse("build/results.xml")
+          root = tree.getroot()
+          total_score = 0
+      
+          output = []
+          for testcase in root.iter("testcase"):
+              name = testcase.get("name", "")
+              failed = (testcase.find("failure") is not None or testcase.find("error") is not None)
+              possible = test_points.get(name, 0)
+              if not failed:
+                  result = f"{name}: PASSED (+{possible} pts)"
+                  total_score += possible
+              else:
+                  result = f"{name}: FAILED (+0 pts, was {possible} pts)"
+              output.append(result)
+      
+          output.append("=========================================")
+          output.append(f"TOTAL POINTS: {total_score}")
+      
+          print("\n".join(output))
+      
+          # Export the total score to an environment file
+          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
+              env_file.write(f"TOTAL_SCORE={total_score}\n")
+          EOF
+
+
+      - name: Create Status Check with Score
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const totalScore = process.env.TOTAL_SCORE || 0;
+            github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: "Autograder Score",
+              head_sha: context.sha,
+              status: "completed",
+              conclusion: "success",
+              output: {
+                title: "Grading Completed",
+                summary: `TOTAL POINTS: ${totalScore}`,
+                text: "Check the detailed breakdown in the workflow logs."
+              }
+            });
+
