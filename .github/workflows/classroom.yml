@@ -1,26 +1,26 @@
-name: Autograding Tests
+name: Build and Test
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
-
-permissions:
-  actions: read
-  contents: read
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  autograding:
+  build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+
     steps:
       # Step 1: Checkout Student Repository
       - name: Checkout Student Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       # Step 2: Checkout Private Tests Repository
       - name: Checkout Private Tests Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           repository: mbjurca/IP_2025_Lab1_tests
           token: ${{ secrets.TEST_REPO_TOKEN }}
@@ -32,7 +32,6 @@ jobs:
         run: |
           cp src/lab1.cpp private_tests/src/lab1.cpp
           cp src/lab1.h   private_tests/src/lab1.h
-          echo "Copied student code to private_tests directory."
 
       # Step 4: Install Dependencies
       - name: Install Dependencies
@@ -41,60 +40,22 @@ jobs:
           sudo apt-get install -y cmake g++ libopencv-dev
 
       # Step 5: Configure CMake
-      - name: Configure CMake
+      - name: Configure (CMake)
         run: cmake -S private_tests -B build
 
       # Step 6: Build the Project
-      - name: Build Project
+      - name: Build
         run: cmake --build build
 
-      # Step 7: Negative Image Test
-      - name: Negative Image Test
-        id: negative-image-test
-        uses: classroom-resources/autograding-command-grader@v1
-        with:
-          test-name: "Negative Image Test"
-          command: "ctest --test-dir build --output-on-failure --tests-regex Lab1Test\\.NegativeImage"
-          timeout: 10
-          max-score: 10
+      # Step 7: Run Tests with CTest
+      - name: Run Tests
+        run: |
+          ctest --test-dir build --output-on-failure
+        continue-on-error: true
 
-      # Step 8: Add Scalar Test
-      - name: Add Scalar Test
-        id: add-scalar-test
-        uses: classroom-resources/autograding-command-grader@v1
-        with:
-          test-name: "Add Scalar Test"
-          command: "ctest --test-dir build --output-on-failure --tests-regex Lab1Test\\.AddScalar"
-          timeout: 10
-          max-score: 10
 
-      # Step 9: Multiply Scalar Test
-      - name: Multiply Scalar Test
-        id: multiply-scalar-test
-        uses: classroom-resources/autograding-command-grader@v1
+      # Step 8: Run Education Autograding
+      - name: Autograding
+        uses: education/autograding@v1
         with:
-          test-name: "Multiply Scalar Test"
-          command: "ctest --test-dir build --output-on-failure --tests-regex Lab1Test\\.MulScalar_Regular"
-          timeout: 10
-          max-score: 10
-
-      # Step 10: Draw Squares Test
-      - name: Draw Squares Test
-        id: draw-squares-test
-        uses: classroom-resources/autograding-command-grader@v1
-        with:
-          test-name: "Draw Squares Test"
-          command: "ctest --test-dir build --output-on-failure --tests-regex Lab1Test\\.DrawSquares"
-          timeout: 10
-          max-score: 10
-
-      # Step 11: Autograding Reporter
-      - name: Autograding Reporter
-        uses: ./  # Ensure this points to your reporter action directory
-        env:
-          NEGATIVE_IMAGE_TEST_RESULTS: "${{ steps.negative-image-test.outputs.result }}"
-          ADD_SCALAR_TEST_RESULTS: "${{ steps.add-scalar-test.outputs.result }}"
-          MULTIPLY_SCALAR_TEST_RESULTS: "${{ steps.multiply-scalar-test.outputs.result }}"
-          DRAW_SQUARES_TEST_RESULTS: "${{ steps.draw-squares-test.outputs.result }}"
-        with:
-          runners: negative-image-test,add-scalar-test,multiply-scalar-test,draw-squares-test
+          token: ${{ secrets.GITHUB_TOKEN }}
