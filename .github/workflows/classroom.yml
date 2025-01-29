@@ -1,17 +1,20 @@
-name: Build and Test
+name: Autograding Tests
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
-  build-and-test:
+  autograding:
     runs-on: ubuntu-latest
-    permissions:
-      checks: write
-      contents: read
 
     steps:
       # Step 1: Checkout Student Repository
@@ -47,15 +50,53 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      # Step 7: Run Tests with CTest
-      - name: Run Tests
-        run: |
-          ctest --test-dir build --output-on-failure
-        continue-on-error: true
+      # 5) Negative Image Test
+      - name: Negative Image Test
+        id: negative-image
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: Negative Image Test
+          command: ctest --test-dir build --output-on-failure --tests-regex Lab1Test\\.NegativeImage
+          max-score: 10
 
+      # 6) Add Scalar Test
+      - name: Add Scalar Test
+        id: add-scalar
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: Add Scalar Test
+          command: ctest --test-dir build --output-on-failure --tests-regex Lab1Test\\.AddScalar
+          max-score: 10
 
-      # Step 8: Run Education Autograding
-      - name: Autograding
-        uses: education/autograding@v1
+      # 7) Multiply Scalar Test
+      - name: Multiply Scalar Test
+        id: multiply-scalar
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: Multiply Scalar Test
+          command: ctest --test-dir build --output-on-failure --tests-regex Lab1Test\\.MulScalar_Regular
+          max-score: 10
+
+      # 8) Draw Squares Test
+      - name: Draw Squares Test
+        id: draw-squares
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: Draw Squares Test
+          command: ctest --test-dir build --output-on-failure --tests-regex Lab1Test\\.DrawSquares
+          max-score: 10
+
+      # 9) Report results to GitHub Classroom
+      - name: Autograding Reporter
+        uses: classroom-resources/autograding-grading-reporter@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Provide the "id" of each grader step (minus the ".outputs.result" suffix),
+          # separated by commas.  These match the 'id:' keys above.
+          runners: negative-image,add-scalar,multiply-scalar,draw-squares
+        env:
+          # Map each step's output to an environment variable
+          NEGATIVE-IMAGE_RESULTS: ${{ steps.negative-image.outputs.result }}
+          ADD-SCALAR_RESULTS: ${{ steps.add-scalar.outputs.result }}
+          MULTIPLY-SCALAR_RESULTS: ${{ steps.multiply-scalar.outputs.result }}
+          DRAW-SQUARES_RESULTS: ${{ steps.draw-squares.outputs.result }}
